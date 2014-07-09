@@ -216,11 +216,12 @@ static void gst_dlna_src_uri_handler_init (gpointer g_iface,
 static gboolean dlna_src_uri_assign (GstDlnaSrc * dlna_src, const gchar * uri,
     GError ** error);
 
-static gboolean dlna_src_uri_init (GstDlnaSrc * dlna_src);
+static gboolean dlna_src_uri_init (GstDlnaSrc * dlna_src, GError ** error);
 
-static gboolean dlna_src_uri_gather_info (GstDlnaSrc * dlna_src);
+static gboolean dlna_src_uri_gather_info (GstDlnaSrc * dlna_src,
+    GError ** error);
 
-static gboolean dlna_src_setup_bin (GstDlnaSrc * dlna_src);
+static gboolean dlna_src_setup_bin (GstDlnaSrc * dlna_src, GError ** error);
 
 static gboolean dlna_src_setup_dtcp (GstDlnaSrc * dlna_src);
 
@@ -1506,7 +1507,7 @@ dlna_src_uri_assign (GstDlnaSrc * dlna_src, const gchar * uri, GError ** error)
 
   dlna_src->uri = g_strdup (uri);
 
-  return dlna_src_uri_init (dlna_src);
+  return dlna_src_uri_init (dlna_src, error);
 }
 
 /**
@@ -1514,7 +1515,7 @@ dlna_src_uri_assign (GstDlnaSrc * dlna_src, const gchar * uri, GError ** error)
  * dtcp decrypter element or not based on HEAD response.
  */
 static gboolean
-dlna_src_uri_init (GstDlnaSrc * dlna_src)
+dlna_src_uri_init (GstDlnaSrc * dlna_src, GError ** error)
 {
   GST_DEBUG_OBJECT (dlna_src, "Initializing URI");
 
@@ -1523,12 +1524,12 @@ dlna_src_uri_init (GstDlnaSrc * dlna_src)
     return TRUE;
   }
 
-  if (!dlna_src_uri_gather_info (dlna_src)) {
+  if (!dlna_src_uri_gather_info (dlna_src, error)) {
     GST_ERROR_OBJECT (dlna_src, "Problems gathering URI info");
     return FALSE;
   }
 
-  if (!dlna_src_setup_bin (dlna_src)) {
+  if (!dlna_src_setup_bin (dlna_src, error)) {
     GST_ERROR_OBJECT (dlna_src, "Problems setting up dtcp elements");
     return FALSE;
   }
@@ -1548,7 +1549,7 @@ dlna_src_uri_init (GstDlnaSrc * dlna_src)
  * @return	true if uri is set without problems, false otherwise
  */
 static gboolean
-dlna_src_setup_bin (GstDlnaSrc * dlna_src)
+dlna_src_setup_bin (GstDlnaSrc * dlna_src, GError ** error)
 {
   guint64 content_size;
   GstPad *pad = NULL;
@@ -1560,6 +1561,8 @@ dlna_src_setup_bin (GstDlnaSrc * dlna_src)
       gst_element_factory_make ("souphttpsrc", ELEMENT_NAME_SOUP_HTTP_SRC);
   if (!dlna_src->http_src) {
     GST_ERROR_OBJECT (dlna_src,
+        "The http soup source element could not be created.");
+    g_set_error (error, GST_URI_ERROR_BAD_URI, GST_URI_ERROR_BAD_REFERENCE,
         "The http soup source element could not be created.");
     return FALSE;
   }
@@ -1576,6 +1579,8 @@ dlna_src_setup_bin (GstDlnaSrc * dlna_src)
   /* Setup dtcp element regardless */
   if (!dlna_src_setup_dtcp (dlna_src)) {
     GST_ERROR_OBJECT (dlna_src, "Problems setting up dtcp elements");
+    g_set_error (error, GST_URI_ERROR_BAD_URI, GST_URI_ERROR_BAD_REFERENCE,
+        "Problems setting up dtcp elements");
     return FALSE;
   }
 
@@ -1584,6 +1589,8 @@ dlna_src_setup_bin (GstDlnaSrc * dlna_src)
   pad = gst_element_get_static_pad (dlna_src->dtcp_decrypter, "src");
   if (!pad) {
     GST_ERROR_OBJECT (dlna_src,
+        "Could not get pad to ghost pad for dlnasrc. Exiting.");
+    g_set_error (error, GST_URI_ERROR_BAD_URI, GST_URI_ERROR_BAD_REFERENCE,
         "Could not get pad to ghost pad for dlnasrc. Exiting.");
     return FALSE;
   }
@@ -1676,7 +1683,7 @@ dlna_src_setup_dtcp (GstDlnaSrc * dlna_src)
  * @return	true if no problems encountered, false otherwise
  */
 static gboolean
-dlna_src_uri_gather_info (GstDlnaSrc * dlna_src)
+dlna_src_uri_gather_info (GstDlnaSrc * dlna_src, GError ** error)
 {
   GString *struct_str = g_string_sized_new (MAX_HTTP_BUF_SIZE);
 
@@ -1715,12 +1722,16 @@ dlna_src_uri_gather_info (GstDlnaSrc * dlna_src)
   if (!dlna_src_soup_session_open (dlna_src)) {
     GST_ERROR_OBJECT (dlna_src,
         "Problems initializing struct to store HEAD response");
+    g_set_error (error, GST_URI_ERROR_BAD_URI, GST_URI_ERROR_BAD_REFERENCE,
+        "Problems initializing struct to store HEAD response");
     return FALSE;
   }
 
   /* Initialize server info */
   if (!dlna_src_head_response_init_struct (dlna_src, &dlna_src->server_info)) {
     GST_ERROR_OBJECT (dlna_src,
+        "Problems initializing struct to store HEAD response");
+    g_set_error (error, GST_URI_ERROR_BAD_URI, GST_URI_ERROR_BAD_REFERENCE,
         "Problems initializing struct to store HEAD response");
     return FALSE;
   }
@@ -1733,6 +1744,8 @@ dlna_src_uri_gather_info (GstDlnaSrc * dlna_src)
           content_features_head_request_headers_array_size,
           content_features_head_request_headers, dlna_src->server_info, TRUE)) {
     GST_ERROR_OBJECT (dlna_src,
+        "Problems issuing HEAD request to get content features");
+    g_set_error (error, GST_URI_ERROR_BAD_URI, GST_URI_ERROR_BAD_REFERENCE,
         "Problems issuing HEAD request to get content features");
     return FALSE;
   }
@@ -1747,6 +1760,8 @@ dlna_src_uri_gather_info (GstDlnaSrc * dlna_src)
             live_content_head_request_headers, dlna_src->server_info, TRUE)) {
       GST_ERROR_OBJECT (dlna_src,
           "Problems issuing HEAD request to get live content information");
+      g_set_error (error, GST_URI_ERROR_BAD_URI, GST_URI_ERROR_BAD_REFERENCE,
+            "Problems issuing HEAD request to get live content information");
       return FALSE;
     }
   } else if (dlna_src->time_seek_supported) {
@@ -1756,6 +1771,8 @@ dlna_src_uri_gather_info (GstDlnaSrc * dlna_src)
             time_seek_head_request_headers_array_size,
             time_seek_head_request_headers, dlna_src->server_info, TRUE)) {
       GST_ERROR_OBJECT (dlna_src,
+          "Problems issuing HEAD request to get time seek information");
+      g_set_error (error, GST_URI_ERROR_BAD_URI, GST_URI_ERROR_BAD_REFERENCE,
           "Problems issuing HEAD request to get time seek information");
       return FALSE;
     }
@@ -1767,6 +1784,8 @@ dlna_src_uri_gather_info (GstDlnaSrc * dlna_src)
             dtcp_range_head_request_headers, dlna_src->server_info, TRUE)) {
       GST_ERROR_OBJECT (dlna_src,
           "Problems issuing HEAD request to get range information");
+      g_set_error (error, GST_URI_ERROR_BAD_URI, GST_URI_ERROR_BAD_REFERENCE,
+          "Problems issuing HEAD request to get range information");
       return FALSE;
     }
   } else if (dlna_src->byte_seek_supported) {
@@ -1776,6 +1795,8 @@ dlna_src_uri_gather_info (GstDlnaSrc * dlna_src)
             range_head_request_headers_array_size,
             range_head_request_headers, dlna_src->server_info, TRUE)) {
       GST_ERROR_OBJECT (dlna_src,
+          "Problems issuing HEAD request to get range information");
+      g_set_error (error, GST_URI_ERROR_BAD_URI, GST_URI_ERROR_BAD_REFERENCE,
           "Problems issuing HEAD request to get range information");
       return FALSE;
     }
