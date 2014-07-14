@@ -447,7 +447,6 @@ gst_dlna_src_init (GstDlnaSrc * dlna_src)
   dlna_src->time_seek_event_start = 0;
   dlna_src->handled_time_seek_seqnum = FALSE;
 
-  dlna_src->is_uri_initialized = FALSE;
   dlna_src->is_live = FALSE;
   dlna_src->is_encrypted = FALSE;
 
@@ -1519,11 +1518,6 @@ dlna_src_uri_init (GstDlnaSrc * dlna_src, GError ** error)
 {
   GST_DEBUG_OBJECT (dlna_src, "Initializing URI");
 
-  if (dlna_src->is_uri_initialized) {
-    GST_DEBUG_OBJECT (dlna_src, "Returning since URI is already initialized");
-    return TRUE;
-  }
-
   if (!dlna_src_uri_gather_info (dlna_src, error)) {
     GST_ERROR_OBJECT (dlna_src, "Problems gathering URI info");
     return FALSE;
@@ -1533,8 +1527,6 @@ dlna_src_uri_init (GstDlnaSrc * dlna_src, GError ** error)
     GST_ERROR_OBJECT (dlna_src, "Problems setting up dtcp elements");
     return FALSE;
   }
-
-  dlna_src->is_uri_initialized = TRUE;
 
   return TRUE;
 }
