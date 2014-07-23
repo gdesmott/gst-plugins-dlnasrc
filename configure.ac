@@ -99,6 +99,7 @@ AC_SUBST(GST_PLUGIN_LDFLAGS)
 
 AC_CONFIG_FILES([
   Makefile \
-  src/Makefile])
+  src/Makefile \
+  tests/Makefile])
 AC_OUTPUT
 
