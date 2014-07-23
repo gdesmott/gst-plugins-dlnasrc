@@ -35,7 +35,6 @@
 #include <stdio.h>
 #include <gst/gst.h>
 #include <glib-object.h>
-#include <libsoup/soup.h>
 
 #include "gstdlnasrc.h"
 
