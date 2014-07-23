@@ -37,6 +37,7 @@
 #include <glib-object.h>
 
 #include "gstdlnasrc.h"
+#include "util.h"
 
 enum
 {
@@ -324,11 +325,6 @@ static gboolean dlna_src_parse_byte_range (GstDlnaSrc * dlna_src,
     const gchar * field_str, gint header_idx, guint64 * start_byte,
     guint64 * end_byte, guint64 * total_bytes);
 
-static gboolean
-dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * npt_str,
-    gchar ** start_str, gchar ** stop_str, gchar ** total_str,
-    guint64 * start, guint64 * stop, guint64 * total);
-
 static gboolean dlna_src_is_change_valid (GstDlnaSrc * dlna_src, gfloat rate,
     GstFormat format, guint64 start,
     GstSeekType start_type, guint64 stop, GstSeekType stop_type);
@@ -338,9 +334,6 @@ static gboolean dlna_src_is_rate_supported (GstDlnaSrc * dlna_src, gfloat rate);
 static gboolean dlna_src_adjust_http_src_headers (GstDlnaSrc * dlna_src,
     gfloat rate, GstFormat format, guint64 start, guint64 stop,
     guint32 new_seqnum);
-
-static gboolean dlna_src_npt_to_nanos (GstDlnaSrc * dlna_src, gchar * string,
-    guint64 * media_time_nanos);
 
 static gboolean
 dlna_src_convert_bytes_to_npt_nanos (GstDlnaSrc * dlna_src, guint64 bytes,
@@ -2688,91 +2681,6 @@ dlna_src_parse_byte_range (GstDlnaSrc * dlna_src,
 }
 
 /**
- * Parse the npt (normal play time) range which may be contained in the following headers:
- *
- * TimeSeekRange.dlna.org : npt=335.1-336.1/40445.4 bytes=1539686400-1540210688/304857907200
- *
- * availableSeekRange.dlna.org: 0 npt=0:00:00.000-0:00:48.716 bytes=0-5219255 cleartextbytes=0-5219255
- *
- * @param   dlna_src    this element instance
- * @param   field_str   string containing HEAD response field header and value
- * @param   start_str   starting time in string form read from header response field
- * @param   stop_str    end time in string form read from header response field
- * @param   total_str   total time in string form read from header response field
- * @param   start       starting time in nanoseconds converted from string representation
- * @param   stop        end time in nanoseconds converted from string representation
- * @param   total       total time in nanoseconds converted from string representation
- *
- * @return  returns TRUE
- */
-static gboolean
-dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
-    gchar ** start_str, gchar ** stop_str, gchar ** total_str,
-    guint64 * start, guint64 * stop, guint64 * total)
-{
-  gchar *header = NULL;
-  gchar *header_value = NULL;
-
-  gint ret_code = 0;
-  gchar tmp1[32] = { 0 };
-  gchar tmp2[32] = { 0 };
-  gchar tmp3[32] = { 0 };
-
-  /* Extract NPT portion of header value */
-  header =
-      strstr (g_ascii_strup (field_str, strlen (field_str)),
-      RANGE_HEADERS[HEADER_INDEX_NPT]);
-  if (header)
-    header_value = strstr (header, "=");
-  if (header_value)
-    header_value++;
-  else {
-    GST_WARNING_OBJECT (dlna_src,
-        "Problems parsing npt from HEAD response field header value: %s",
-        field_str);
-    return FALSE;
-  }
-
-  /* Determine if npt string includes total */
-  if (strstr (header_value, "/")) {
-    /* Extract start and end and total NPT */
-    if ((ret_code =
-            sscanf (header_value, "%31[^-]-%31[^/]/%31s %*s", tmp1, tmp2,
-                tmp3)) != 3) {
-      GST_WARNING_OBJECT (dlna_src,
-          "Problems parsing NPT from HEAD response field header %s, value: %s, retcode: %d, tmp: %s, %s, %s",
-          field_str, header_value, ret_code, tmp1, tmp2, tmp3);
-      return FALSE;
-    }
-
-    g_free (*total_str);
-    *total_str = g_strdup (tmp3);
-    if (strcmp (*total_str, "*") != 0)
-      if (!dlna_src_npt_to_nanos (dlna_src, *total_str, total))
-        return FALSE;
-  } else {
-    /* Extract start and end (there is no total) NPT */
-    if ((ret_code = sscanf (header_value, "%31[^-]-%31s %*s", tmp1, tmp2)) != 2) {
-      GST_WARNING_OBJECT (dlna_src,
-          "Problems parsing NPT from HEAD response field header %s, value: %s, retcode: %d, tmp: %s, %s",
-          field_str, header_value, ret_code, tmp1, tmp2);
-      return FALSE;
-    }
-  }
-  g_free (*start_str);
-  *start_str = g_strdup (tmp1);
-  if (!dlna_src_npt_to_nanos (dlna_src, *start_str, start))
-    return FALSE;
-
-  g_free (*stop_str);
-  *stop_str = g_strdup (tmp2);
-  if (!dlna_src_npt_to_nanos (dlna_src, *stop_str, stop))
-    return FALSE;
-
-  return TRUE;
-}
-
-/**
  * Extract values from content features header in HEAD Response
  *
  * @param	dlna_src	this element
@@ -3751,59 +3659,6 @@ overflow:
 }
 
 /**
- * Convert supplied string which represents normal play time (npt) into
- * nanoseconds.  The format of NPT is as follows:
- *
- * npt time  = npt sec | npt hhmmss
- *
- * npt sec   = 1*DIGIT [ "." 1*3DIGIT ]
- * npthhmmss = npthh":"nptmm":"nptss["."1*3DIGIT]
- * npthh     = 1*DIGIT     ; any positive number
- * nptmm     = 1*2DIGIT    ; 0-59
- * nptss     = 1*2DIGIT    ; 0-59
- *
- * @param	dlna_src			this element, needed for logging
- * @param	string				normal play time string to convert
- * @param	media_time_nanos	npt string value converted into nanoseconds
- *
- * @return	true if no problems encountered, false otherwise
- */
-static gboolean
-dlna_src_npt_to_nanos (GstDlnaSrc * dlna_src, gchar * string,
-    guint64 * media_time_nanos)
-{
-  gboolean ret = FALSE;
-
-  guint hours = 0;
-  guint mins = 0;
-  float secs = 0.;
-
-  if (sscanf (string, "%u:%u:%f", &hours, &mins, &secs) == 3) {
-    /* Long form */
-    *media_time_nanos =
-        ((hours * 60 * 60 * 1000) + (mins * 60 * 1000) +
-        (secs * 1000)) * 1000000L;
-    ret = TRUE;
-
-    GST_LOG_OBJECT (dlna_src,
-        "Convert npt str %s hr=%d:mn=%d:s=%f into nanosecs: %"
-        G_GUINT64_FORMAT, string, hours, mins, secs, *media_time_nanos);
-  } else if (sscanf (string, "%f", &secs) == 1) {
-    /* Short form */
-    *media_time_nanos = (secs * 1000) * 1000000L;
-    ret = TRUE;
-    GST_LOG_OBJECT (dlna_src,
-        "Convert npt str %s secs=%f into nanosecs: %"
-        G_GUINT64_FORMAT, string, secs, *media_time_nanos);
-  } else {
-    GST_ERROR_OBJECT (dlna_src,
-        "Problems converting npt str into nanosecs: %s", string);
-  }
-
-  return ret;
-}
-
-/**
  * Formats given nanoseconds into string which represents normal play time (npt).
  * The format of NPT is as follows:
  *
@@ -3830,7 +3685,6 @@ dlna_src_nanos_to_npt (GstDlnaSrc * dlna_src, guint64 media_time_nanos,
 
   g_string_append_printf (npt_str, "%d:%02d:%02.3f", hours, minutes, seconds);
 }
-
 
 /* entry point to initialize the plug-in
  * initialize the plug-in itself

@@ -18,7 +18,11 @@ plugin_LTLIBRARIES = src/libgstdlnasrc.la
 ##############################################################################
 
 # sources used to compile this plug-in
-src_libgstdlnasrc_la_SOURCES = src/gstdlnasrc.c src/gstdlnasrc.h 
+src_libgstdlnasrc_la_SOURCES = \
+	src/gstdlnasrc.c \
+	src/gstdlnasrc.h \
+	src/util.c \
+	src/util.h
 
 # compiler and linker flags used to compile this plugin, set in configure.ac
 src_libgstdlnasrc_la_CFLAGS = $(GST_CFLAGS) $(SOUP_CFLAGS)
@@ -28,4 +32,6 @@ src_libgstdlnasrc_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 src_libgstdlnasrc_la_LIBTOOLFLAGS = --tag=disable-static
 
 # headers we need but don't want installed
-noinst_HEADERS = src/gstdlnasrc.h
+noinst_HEADERS = \
+	src/gstdlnasrc.h \
+	src/util.h
