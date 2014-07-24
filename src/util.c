@@ -151,16 +151,18 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
   if (!dlna_src_npt_to_nanos (dlna_src, *start_str, start))
     goto fail;
 
-  /* Read stop value */
-  ret_code = sscanf (cursor, "%31[^/ ]%*s", tmp2);
-  if (ret_code == -1)
-    goto fail;
+  /* Read stop value, if any */
+  if (g_ascii_isdigit (cursor[0])) {
+    ret_code = sscanf (cursor, "%31[^/ ]%*s", tmp2);
+    if (ret_code == -1)
+      goto fail;
 
-  cursor += strlen (tmp2);
+    cursor += strlen (tmp2);
 
-  *stop_str = g_strdup (tmp2);
-  if (!dlna_src_npt_to_nanos (dlna_src, *stop_str, stop))
-    goto fail;
+    *stop_str = g_strdup (tmp2);
+    if (!dlna_src_npt_to_nanos (dlna_src, *stop_str, stop))
+      goto fail;
+  }
 
   /* Do we have the total length? */
   if (cursor[0] == '/') {
