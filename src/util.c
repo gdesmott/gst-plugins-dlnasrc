@@ -117,6 +117,17 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
   gchar tmp2[32] = { 0 };
   gchar tmp3[32] = { 0 };
 
+  /* Init output variables */
+  g_free (*start_str);
+  g_free (*stop_str);
+  g_free (*total_str);
+  *start_str = NULL;
+  *stop_str = NULL;
+  *total_str = NULL;
+  *start = 0;
+  *stop = 0;
+  *total = 0;
+
   /* Extract NPT portion of header value */
   header =
       strstr (g_ascii_strup (field_str, strlen (field_str)), "NPT");
@@ -143,7 +154,6 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
       return FALSE;
     }
 
-    g_free (*total_str);
     *total_str = g_strdup (tmp3);
     if (strcmp (*total_str, "*") != 0)
       if (!dlna_src_npt_to_nanos (dlna_src, *total_str, total))
@@ -157,12 +167,10 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
       return FALSE;
     }
   }
-  g_free (*start_str);
   *start_str = g_strdup (tmp1);
   if (!dlna_src_npt_to_nanos (dlna_src, *start_str, start))
     return FALSE;
 
-  g_free (*stop_str);
   *stop_str = g_strdup (tmp2);
   if (!dlna_src_npt_to_nanos (dlna_src, *stop_str, stop))
     return FALSE;
