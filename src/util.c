@@ -109,10 +109,8 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
     gchar ** start_str, gchar ** stop_str, gchar ** total_str,
     guint64 * start, guint64 * stop, guint64 * total)
 {
-  gchar *header = NULL;
-  gchar *header_value = NULL;
-
-  gint ret_code = 0;
+  gchar *field, *cursor;
+  gint ret_code;
   gchar tmp1[32] = { 0 };
   gchar tmp2[32] = { 0 };
   gchar tmp3[32] = { 0 };
@@ -128,54 +126,65 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
   *stop = 0;
   *total = 0;
 
+  /* Convert everything to upper case */
+  field = g_ascii_strup (field_str, -1);
+
   /* Extract NPT portion of header value */
-  header =
-      strstr (g_ascii_strup (field_str, strlen (field_str)), "NPT");
-  if (header)
-    header_value = strstr (header, "=");
-  if (header_value)
-    header_value++;
-  else {
-    GST_WARNING_OBJECT (dlna_src,
-        "Problems parsing npt from HEAD response field header value: %s",
-        field_str);
-    return FALSE;
-  }
+  cursor = strstr (field, "NPT");
+  if (!cursor)
+    goto fail;
 
-  /* Determine if npt string includes total */
-  if (strstr (header_value, "/")) {
-    /* Extract start and end and total NPT */
-    if ((ret_code =
-            sscanf (header_value, "%31[^-]-%31[^/]/%31s %*s", tmp1, tmp2,
-                tmp3)) != 3) {
-      GST_WARNING_OBJECT (dlna_src,
-          "Problems parsing NPT from HEAD response field header %s, value: %s, retcode: %d, tmp: %s, %s, %s",
-          field_str, header_value, ret_code, tmp1, tmp2, tmp3);
-      return FALSE;
-    }
+  cursor = strstr (cursor, "=");
+  if (!cursor)
+    goto fail;
 
-    *total_str = g_strdup (tmp3);
-    if (strcmp (*total_str, "*") != 0)
-      if (!dlna_src_npt_to_nanos (dlna_src, *total_str, total))
-        return FALSE;
-  } else {
-    /* Extract start and end (there is no total) NPT */
-    if ((ret_code = sscanf (header_value, "%31[^-]-%31s %*s", tmp1, tmp2)) != 2) {
-      GST_WARNING_OBJECT (dlna_src,
-          "Problems parsing NPT from HEAD response field header %s, value: %s, retcode: %d, tmp: %s, %s",
-          field_str, header_value, ret_code, tmp1, tmp2);
-      return FALSE;
-    }
-  }
+  cursor++; /* '=' */
+
+  /* Read start value and '-' */
+  ret_code = sscanf (cursor, "%31[^-]-%*s", tmp1);
+  if (ret_code == -1)
+    goto fail;
+
+  cursor += strlen (tmp1) + 1;
+
   *start_str = g_strdup (tmp1);
   if (!dlna_src_npt_to_nanos (dlna_src, *start_str, start))
-    return FALSE;
+    goto fail;
 
-  *stop_str = g_strdup (tmp2);
-  if (!dlna_src_npt_to_nanos (dlna_src, *stop_str, stop))
-    return FALSE;
+  /* Read stop value, if any */
+  if (g_ascii_isdigit (cursor[0])) {
+    ret_code = sscanf (cursor, "%31[^/ ]%*s", tmp2);
+    if (ret_code == -1)
+      goto fail;
 
+    cursor += strlen (tmp2);
+
+    *stop_str = g_strdup (tmp2);
+    if (!dlna_src_npt_to_nanos (dlna_src, *stop_str, stop))
+      goto fail;
+  }
+
+  /* Do we have the total length? */
+  if (cursor[0] == '/') {
+    cursor++; /* '/' */
+    ret_code = sscanf (cursor, "%31s %*s", tmp3);
+    if (ret_code == -1)
+      goto fail;
+
+    *total_str = g_strdup (tmp3);
+
+    if (strcmp (*total_str, "*") != 0)
+      if (!dlna_src_npt_to_nanos (dlna_src, *total_str, total))
+        goto fail;
+  }
+
+  g_free (field);
   return TRUE;
+
+fail:
+  GST_WARNING_OBJECT (dlna_src,
+      "Problems parsing npt from HEAD response field header value: %s",
+      field_str);
+  g_free (field);
+  return FALSE;
 }
-
-
