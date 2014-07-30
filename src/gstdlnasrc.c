@@ -448,8 +448,8 @@ gst_dlna_src_init (GstDlnaSrc * dlna_src)
   dlna_src->byte_total = 0;
 
   dlna_src->time_seek_supported = FALSE;
-  dlna_src->npt_start_nanos = 0;
-  dlna_src->npt_end_nanos = 0;
+  dlna_src->npt_start_nanos = GST_CLOCK_TIME_NONE;
+  dlna_src->npt_end_nanos = GST_CLOCK_TIME_NONE;
   dlna_src->npt_duration_nanos = 0;
   dlna_src->npt_start_str = NULL;
   dlna_src->npt_end_str = NULL;
@@ -2202,8 +2202,8 @@ dlna_src_head_response_init_struct (GstDlnaSrc * dlna_src,
   head_response->time_seek_npt_start_str = NULL;
   head_response->time_seek_npt_end_str = NULL;
   head_response->time_seek_npt_duration_str = NULL;
-  head_response->time_seek_npt_start = 0;
-  head_response->time_seek_npt_end = 0;
+  head_response->time_seek_npt_start = GST_CLOCK_TIME_NONE;
+  head_response->time_seek_npt_end = GST_CLOCK_TIME_NONE;
   head_response->time_seek_npt_duration = 0;
 
   /* BYTES portion of TIMESEEKRANGE.DLNA.ORG */
@@ -2219,8 +2219,8 @@ dlna_src_head_response_init_struct (GstDlnaSrc * dlna_src,
   head_response->available_range_idx = HEADER_INDEX_AVAILABLE_RANGE;
   head_response->available_seek_npt_start_str = NULL;
   head_response->available_seek_npt_end_str = NULL;
-  head_response->available_seek_npt_start = 0;
-  head_response->available_seek_npt_end = 0;
+  head_response->available_seek_npt_start = GST_CLOCK_TIME_NONE;
+  head_response->available_seek_npt_end = GST_CLOCK_TIME_NONE;
   head_response->available_seek_start = 0;
   head_response->available_seek_end = 0;
   head_response->available_seek_cleartext_start = 0;

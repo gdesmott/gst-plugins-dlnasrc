@@ -37,7 +37,7 @@ test_parse_ntp_range (void)
   do_test_parse_ntp_range ("availableSeekRange.dlna.org: 0 npt=0:00:00.000-0:00:48.716 bytes=0-5219255 cleartextbytes=0-5219255",
       "0:00:00.000", "0:00:48.716", NULL, 0, 48716001280, 0);
   do_test_parse_ntp_range ("npt=10.0-/* bytes=24409920-198755327/198755328",
-      "10.0", NULL, "*", 10000000000, 0, 0);
+      "10.0", NULL, "*", 10000000000, GST_CLOCK_TIME_NONE, 0);
 }
 
 int

@@ -122,8 +122,8 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
   *start_str = NULL;
   *stop_str = NULL;
   *total_str = NULL;
-  *start = 0;
-  *stop = 0;
+  *start = GST_CLOCK_TIME_NONE;
+  *stop = GST_CLOCK_TIME_NONE;
   *total = 0;
 
   /* Convert everything to upper case */
