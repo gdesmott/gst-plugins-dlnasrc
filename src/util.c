@@ -116,9 +116,12 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
   gchar tmp3[32] = { 0 };
 
   /* Init output variables */
-  g_free (*start_str);
-  g_free (*stop_str);
-  g_free (*total_str);
+  if (start_str)
+     g_free (*start_str);
+  if (stop_str)
+    g_free (*stop_str);
+  if (total_str)
+    g_free (*total_str);
   *start_str = NULL;
   *stop_str = NULL;
   *total_str = NULL;
