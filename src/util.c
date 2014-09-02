@@ -106,7 +106,7 @@ dlna_src_npt_to_nanos (GstDlnaSrc * dlna_src, gchar * string,
  */
 gboolean
 dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
-    gchar ** start_str, gchar ** stop_str, gchar ** total_str,
+    gchar ** start_str_out, gchar ** stop_str_out, gchar ** total_str_out,
     guint64 * start, guint64 * stop, guint64 * total)
 {
   gchar *field, *cursor;
@@ -114,17 +114,11 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
   gchar tmp1[32] = { 0 };
   gchar tmp2[32] = { 0 };
   gchar tmp3[32] = { 0 };
+  gchar *start_str = NULL;
+  gchar *stop_str = NULL;
+  gchar *total_str = NULL;
 
   /* Init output variables */
-  if (start_str)
-     g_free (*start_str);
-  if (stop_str)
-    g_free (*stop_str);
-  if (total_str)
-    g_free (*total_str);
-  *start_str = NULL;
-  *stop_str = NULL;
-  *total_str = NULL;
   *start = GST_CLOCK_TIME_NONE;
   *stop = GST_CLOCK_TIME_NONE;
   *total = 0;
@@ -150,8 +144,8 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
 
   cursor += strlen (tmp1) + 1;
 
-  *start_str = g_strdup (tmp1);
-  if (!dlna_src_npt_to_nanos (dlna_src, *start_str, start))
+  start_str = g_strdup (tmp1);
+  if (!dlna_src_npt_to_nanos (dlna_src, start_str, start))
     goto fail;
 
   /* Read stop value, if any */
@@ -162,8 +156,8 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
 
     cursor += strlen (tmp2);
 
-    *stop_str = g_strdup (tmp2);
-    if (!dlna_src_npt_to_nanos (dlna_src, *stop_str, stop))
+    stop_str = g_strdup (tmp2);
+    if (!dlna_src_npt_to_nanos (dlna_src, stop_str, stop))
       goto fail;
   }
 
@@ -174,13 +168,28 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
     if (ret_code == -1)
       goto fail;
 
-    *total_str = g_strdup (tmp3);
+    total_str = g_strdup (tmp3);
 
-    if (strcmp (*total_str, "*") != 0)
-      if (!dlna_src_npt_to_nanos (dlna_src, *total_str, total))
+    if (strcmp (total_str, "*") != 0)
+      if (!dlna_src_npt_to_nanos (dlna_src, total_str, total))
         goto fail;
   }
 
+  if (start_str_out) {
+    if (*start_str_out)
+      g_free(start_str_out);
+    *start_str_out = start_str;
+  }
+  if (stop_str_out) {
+    if (*stop_str_out)
+      g_free(stop_str_out);
+    *stop_str_out = stop_str;
+  }
+  if (total_str_out) {
+    if (*total_str_out)
+      g_free(total_str_out);
+    *total_str_out = total_str;
+  }
   g_free (field);
   return TRUE;
 
