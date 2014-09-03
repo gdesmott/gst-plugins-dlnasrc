@@ -53,9 +53,10 @@
  */
 static gboolean
 dlna_src_npt_to_nanos (GstDlnaSrc * dlna_src, gchar * string,
-    guint64 * media_time_nanos)
+    guint64 * media_time_nanos_out)
 {
   gboolean ret = FALSE;
+  guint64 media_time_nanos;
 
   guint hours = 0;
   guint mins = 0;
@@ -63,27 +64,53 @@ dlna_src_npt_to_nanos (GstDlnaSrc * dlna_src, gchar * string,
 
   if (sscanf (string, "%u:%u:%f", &hours, &mins, &secs) == 3) {
     /* Long form */
-    *media_time_nanos =
+    media_time_nanos =
         ((hours * 60 * 60 * 1000) + (mins * 60 * 1000) +
         (secs * 1000)) * 1000000L;
     ret = TRUE;
 
     GST_LOG_OBJECT (dlna_src,
         "Convert npt str %s hr=%d:mn=%d:s=%f into nanosecs: %"
-        G_GUINT64_FORMAT, string, hours, mins, secs, *media_time_nanos);
+        G_GUINT64_FORMAT, string, hours, mins, secs, media_time_nanos);
   } else if (sscanf (string, "%f", &secs) == 1) {
     /* Short form */
-    *media_time_nanos = (secs * 1000) * 1000000L;
+    media_time_nanos = (secs * 1000) * 1000000L;
     ret = TRUE;
     GST_LOG_OBJECT (dlna_src,
         "Convert npt str %s secs=%f into nanosecs: %"
-        G_GUINT64_FORMAT, string, secs, *media_time_nanos);
+        G_GUINT64_FORMAT, string, secs, media_time_nanos);
   } else {
     GST_ERROR_OBJECT (dlna_src,
         "Problems converting npt str into nanosecs: %s", string);
   }
+  if (ret && media_time_nanos_out)
+    *media_time_nanos_out = media_time_nanos;
 
   return ret;
+}
+
+static gboolean
+parse_range_part (GstDlnaSrc * dlna_src, gchar ** cursor, char *format,
+    char **result_str, guint64 * result, gboolean is_total)
+{
+  gchar tmp[32] = { 0 };
+  if (sscanf (*cursor, format, tmp) == -1)
+    return FALSE;
+
+  *cursor += strlen (tmp) + 1;
+
+  if (result_str) {
+    if (*result_str)
+      g_free (*result_str);
+    *result_str = g_strdup (tmp);
+  }
+
+  if (is_total && strcmp (tmp, "*") == 0) {
+    if (result)
+      *result = 0;
+    return TRUE;
+  } else
+    return dlna_src_npt_to_nanos (dlna_src, tmp, result);
 }
 
 /**
@@ -106,22 +133,10 @@ dlna_src_npt_to_nanos (GstDlnaSrc * dlna_src, gchar * string,
  */
 gboolean
 dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
-    gchar ** start_str_out, gchar ** stop_str_out, gchar ** total_str_out,
+    gchar ** start_str, gchar ** stop_str, gchar ** total_str,
     guint64 * start, guint64 * stop, guint64 * total)
 {
   gchar *field, *cursor;
-  gint ret_code;
-  gchar tmp1[32] = { 0 };
-  gchar tmp2[32] = { 0 };
-  gchar tmp3[32] = { 0 };
-  gchar *start_str = NULL;
-  gchar *stop_str = NULL;
-  gchar *total_str = NULL;
-
-  /* Init output variables */
-  *start = GST_CLOCK_TIME_NONE;
-  *stop = GST_CLOCK_TIME_NONE;
-  *total = 0;
 
   /* Convert everything to upper case */
   field = g_ascii_strup (field_str, -1);
@@ -135,61 +150,28 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
   if (!cursor)
     goto fail;
 
-  cursor++; /* '=' */
+  cursor++;                     /* '=' */
 
   /* Read start value and '-' */
-  ret_code = sscanf (cursor, "%31[^-]-%*s", tmp1);
-  if (ret_code == -1)
-    goto fail;
-
-  cursor += strlen (tmp1) + 1;
-
-  start_str = g_strdup (tmp1);
-  if (!dlna_src_npt_to_nanos (dlna_src, start_str, start))
+  if (!parse_range_part (dlna_src, &cursor, "%31[^-]-%*s", start_str, start,
+          FALSE))
     goto fail;
 
   /* Read stop value, if any */
   if (g_ascii_isdigit (cursor[0])) {
-    ret_code = sscanf (cursor, "%31[^/ ]%*s", tmp2);
-    if (ret_code == -1)
-      goto fail;
-
-    cursor += strlen (tmp2);
-
-    stop_str = g_strdup (tmp2);
-    if (!dlna_src_npt_to_nanos (dlna_src, stop_str, stop))
+    if (!parse_range_part (dlna_src, &cursor, "%31[^/ ]%*s", stop_str, stop,
+            FALSE))
       goto fail;
   }
 
   /* Do we have the total length? */
   if (cursor[0] == '/') {
-    cursor++; /* '/' */
-    ret_code = sscanf (cursor, "%31s %*s", tmp3);
-    if (ret_code == -1)
+    cursor++;                   /* '/' */
+    if (!parse_range_part (dlna_src, &cursor, "%31s %*s", total_str, total,
+            TRUE))
       goto fail;
-
-    total_str = g_strdup (tmp3);
-
-    if (strcmp (total_str, "*") != 0)
-      if (!dlna_src_npt_to_nanos (dlna_src, total_str, total))
-        goto fail;
   }
 
-  if (start_str_out) {
-    if (*start_str_out)
-      g_free(start_str_out);
-    *start_str_out = start_str;
-  }
-  if (stop_str_out) {
-    if (*stop_str_out)
-      g_free(stop_str_out);
-    *stop_str_out = stop_str;
-  }
-  if (total_str_out) {
-    if (*total_str_out)
-      g_free(total_str_out);
-    *total_str_out = total_str;
-  }
   g_free (field);
   return TRUE;
 
