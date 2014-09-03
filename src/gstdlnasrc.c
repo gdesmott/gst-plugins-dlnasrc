@@ -388,7 +388,8 @@ gst_dlna_src_class_init (GstDlnaSrcClass * klass)
 
   g_object_class_install_property (gobject_klass, PROP_URI,
       g_param_spec_string ("uri", "Stream URI",
-          "Sets URI A/V stream", NULL, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          "Sets URI A/V stream", NULL,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_klass, PROP_SUPPORTED_RATES,
       g_param_spec_boxed ("supported-rates",
@@ -399,7 +400,8 @@ gst_dlna_src_class_init (GstDlnaSrcClass * klass)
   g_object_class_install_property (gobject_klass, PROP_DTCP_BLOCKSIZE,
       g_param_spec_uint ("dtcp-blocksize", "DTCP Block size",
           "Size in bytes to read per buffer when content is dtcp encrypted (-1 = default)",
-          0, G_MAXUINT, DEFAULT_DTCP_BLOCKSIZE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          0, G_MAXUINT, DEFAULT_DTCP_BLOCKSIZE,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   gobject_klass->finalize = GST_DEBUG_FUNCPTR (gst_dlna_src_finalize);
   gstelement_klass->change_state = gst_dlna_src_change_state;
@@ -1632,11 +1634,11 @@ dlna_src_setup_dtcp (GstDlnaSrc * dlna_src)
   }
 
   if (dlna_src->is_encrypted) {
-  g_object_set (G_OBJECT (dlna_src->dtcp_decrypter), "dtcp1host",
-      dlna_src->server_info->dtcp_host, NULL);
+    g_object_set (G_OBJECT (dlna_src->dtcp_decrypter), "dtcp1host",
+        dlna_src->server_info->dtcp_host, NULL);
 
-  g_object_set (G_OBJECT (dlna_src->dtcp_decrypter), "dtcp1port",
-      dlna_src->server_info->dtcp_port, NULL);
+    g_object_set (G_OBJECT (dlna_src->dtcp_decrypter), "dtcp1port",
+        dlna_src->server_info->dtcp_port, NULL);
   }
 
   gst_bin_add (GST_BIN (&dlna_src->bin), dlna_src->dtcp_decrypter);
@@ -1745,7 +1747,7 @@ dlna_src_uri_gather_info (GstDlnaSrc * dlna_src, GError ** error)
       GST_ERROR_OBJECT (dlna_src,
           "Problems issuing HEAD request to get live content information");
       g_set_error (error, GST_URI_ERROR_BAD_URI, GST_URI_ERROR_BAD_REFERENCE,
-            "Problems issuing HEAD request to get live content information");
+          "Problems issuing HEAD request to get live content information");
       return FALSE;
     }
   } else if (dlna_src->time_seek_supported) {
