@@ -40,6 +40,33 @@ test_parse_ntp_range (void)
       "10.0", NULL, "*", 10000000000, GST_CLOCK_TIME_NONE, 0);
 }
 
+static void
+do_test_parse_byte_range (const gchar *field, const gchar *header,
+    guint64 expected_start, guint64 expected_stop, guint64 expected_total)
+{
+  guint64 start, stop, total;
+
+  g_assert (dlna_src_parse_byte_range (NULL, field, header, &start, &stop,
+        &total));
+
+  g_assert_cmpuint (start, ==, expected_start);
+  g_assert_cmpuint (stop, ==, expected_stop);
+  g_assert_cmpuint (total, ==, expected_total);
+}
+
+static void
+test_parse_byte_range (void)
+{
+  do_test_parse_byte_range ("TimeSeekRange.dlna.org : npt=335.1-336.1/40445.4 bytes=1539686400-1540210688/304857907200",
+      "BYTES", 1539686400, 1540210688, 304857907200);
+  do_test_parse_byte_range ("Content-Range: bytes 0-1859295/1859295",
+      "BYTES", 0, 1859295, 1859295);
+  do_test_parse_byte_range ("Content-Range.dtcp.com: bytes=0-9931928/9931929",
+      "BYTES", 0, 9931928, 9931929);
+  do_test_parse_byte_range ("availableSeekRange.dlna.org: 0 npt=0:00:00.000-0:00:48.716 bytes=0-219255 cleartextbytes=0-5219255",
+      "CLEARTEXTBYTES", 0, 5219255, 0);
+}
+
 int
 main (int argc,
     char **argv)
@@ -47,6 +74,7 @@ main (int argc,
   g_test_init (&argc, &argv, NULL);
 
   g_test_add_func ("/util/parse-ntp-range", test_parse_ntp_range);
+  g_test_add_func ("/util/parse-byte-range", test_parse_byte_range);
 
   return g_test_run ();
 }
