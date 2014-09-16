@@ -138,6 +138,14 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
 {
   gchar *field, *cursor;
 
+  /* Init output variables */
+  if (start)
+    *start = GST_CLOCK_TIME_NONE;
+  if (stop)
+    *stop = GST_CLOCK_TIME_NONE;
+  if (total)
+    *total = 0;
+
   /* Convert everything to upper case */
   field = g_ascii_strup (field_str, -1);
 
