@@ -192,3 +192,91 @@ fail:
   g_free (field);
   return FALSE;
 }
+
+/**
+ * Parse the byte range which may be contained in the following headers:
+ *
+ * TimeSeekRange.dlna.org : npt=335.1-336.1/40445.4 bytes=1539686400-1540210688/304857907200
+ *
+ * Content-Range: bytes 0-1859295/1859295
+ *
+ * Content-Range.dtcp.com: bytes=0-9931928/9931929
+ *
+ * availableSeekRange.dlna.org: 0 npt=0:00:00.000-0:00:48.716 bytes=0-5219255 cleartextbytes=0-5219255
+ *
+ * @param   dlna_src    this element instance
+ * @param   field_str   string containing HEAD response field header and value
+ * @param   expected_header which byte header to use - bytes or cleartextbytes
+ * @param   start_byte  starting byte position read from header response field
+ * @param   end_byte    end byte position read from header response field
+ * @param   total_bytes total bytes read from header response field
+ *
+ * @return  returns TRUE
+ */
+gboolean
+dlna_src_parse_byte_range (GstDlnaSrc * dlna_src,
+    const gchar * field_str, const gchar * expected_header,
+    guint64 * start_byte, guint64 * end_byte, guint64 * total_bytes)
+{
+  gchar *header = NULL;
+  gchar *header_value = NULL;
+
+  gint ret_code = 0;
+  guint64 ullong1 = 0;
+  guint64 ullong2 = 0;
+  guint64 ullong3 = 0;
+
+  /* Extract BYTES portion of header value */
+  header =
+      strstr (g_ascii_strup (field_str, strlen (field_str)), expected_header);
+
+  if (header)
+    header_value = strstr (header, "=");
+  if (header && !header_value)
+    header_value = strstr (header, " ");
+  if (header_value)
+    header_value++;
+  else {
+    GST_WARNING_OBJECT (dlna_src,
+        "Bytes not included in header from HEAD response field header value: %s",
+        field_str);
+    return FALSE;
+  }
+
+  /* Determine if byte string includes total which is not an * */
+  if (strstr (header_value, "/") && !strstr (header_value, "*")) {
+    /* Extract start and end and total BYTES */
+    if ((ret_code =
+            sscanf (header_value,
+                "%" G_GUINT64_FORMAT "-%" G_GUINT64_FORMAT "/%"
+                G_GUINT64_FORMAT, &ullong1, &ullong2, &ullong3)) != 3) {
+      GST_WARNING_OBJECT (dlna_src,
+          "Problems parsing BYTES from HEAD response field header %s, value: %s, retcode: %d, ullong: %"
+          G_GUINT64_FORMAT ", %" G_GUINT64_FORMAT
+          ", %" G_GUINT64_FORMAT,
+          field_str, header_value, ret_code, ullong1, ullong2, ullong3);
+      return FALSE;
+    }
+  } else {
+    /* Extract start and end (there is no total) BYTES */
+    if ((ret_code =
+            sscanf (header_value,
+                "%" G_GUINT64_FORMAT "-%" G_GUINT64_FORMAT, &ullong1,
+                &ullong2)) != 2) {
+      GST_WARNING_OBJECT (dlna_src,
+          "Problems parsing BYTES from HEAD response field header %s, value: %s, retcode: %d, ullong: %"
+          G_GUINT64_FORMAT ", %" G_GUINT64_FORMAT, field_str, header_value,
+          ret_code, ullong1, ullong2);
+      return FALSE;
+    }
+  }
+
+  if (start_byte)
+    *start_byte = ullong1;
+  if (end_byte)
+    *end_byte = ullong2;
+  if (total_bytes)
+    *total_bytes = ullong3;
+
+  return TRUE;
+}

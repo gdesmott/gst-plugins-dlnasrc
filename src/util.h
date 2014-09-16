@@ -32,4 +32,8 @@ gboolean dlna_src_parse_npt_range (GstDlnaSrc * dlna_src,
     const gchar * field_str, gchar ** start_str, gchar ** stop_str,
     gchar ** total_str, guint64 * start, guint64 * stop, guint64 * total);
 
+gboolean dlna_src_parse_byte_range (GstDlnaSrc * dlna_src,
+    const gchar * field_str, const gchar * header, guint64 * start_byte,
+    guint64 * end_byte, guint64 * total_bytes);
+
 #endif /* __GST_DLNA_SRC_UTIL_H__ */
