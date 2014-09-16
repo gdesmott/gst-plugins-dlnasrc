@@ -97,7 +97,7 @@ parse_range_part (GstDlnaSrc * dlna_src, gchar ** cursor, char *format,
   if (sscanf (*cursor, format, tmp) == -1)
     return FALSE;
 
-  *cursor += strlen (tmp) + 1;
+  *cursor += strlen (tmp);
 
   if (result_str) {
     if (*result_str)
@@ -152,10 +152,12 @@ dlna_src_parse_npt_range (GstDlnaSrc * dlna_src, const gchar * field_str,
 
   cursor++;                     /* '=' */
 
-  /* Read start value and '-' */
+  /* Read start */
   if (!parse_range_part (dlna_src, &cursor, "%31[^-]-%*s", start_str, start,
           FALSE))
     goto fail;
+
+  cursor++;                     /* '-' */
 
   /* Read stop value, if any */
   if (g_ascii_isdigit (cursor[0])) {
